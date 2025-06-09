@@ -15,8 +15,9 @@ env:
 # Limpiar archivos generados
 clean:
 	find . -name "*.json" -type f -delete
+	find . -name "*.xlsx" -type f -delete
 	find . -name "__pycache__" -type d -exec rm -rf {} +
-	@echo "Archivos JSON y directorios __pycache__ eliminados"
+	@echo "Archivos JSON, XLSX y directorios __pycache__ eliminados"
 
 # Limpiar entorno virtual
 clean-env:
