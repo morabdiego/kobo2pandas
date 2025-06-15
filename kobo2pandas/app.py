@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional, Union
-from .types import JSONData, JSONDict, AssetList, DataFrameDict, ProcessingConfig, KoboEndpoint
+from .types import JSONData, JSONDict, AssetList, DataFrameDict, DataFrameList, ProcessingConfig, KoboEndpoint
 from .client import KoboHTTPClient
 from .processor import JSONDataProcessor, ExcelExporter
 from .utils import DataValidationUtils, StringUtils
@@ -11,7 +11,7 @@ class KoboAPI:
     def __init__(self, token: str, endpoint: str = 'default', debug: bool = False):
         self._config = ProcessingConfig(debug=debug)
         resolved_endpoint = self._resolve_endpoint(endpoint)
-        
+
         self._http_client = KoboHTTPClient(token, resolved_endpoint, self._config)
         self._data_processor = JSONDataProcessor(self._config)
         self._excel_exporter = ExcelExporter(self._config)
@@ -53,8 +53,19 @@ class KoboAPI:
         except Exception:
             return {}
 
-    def get_dataframes(self, asset_uid: str, **kwargs) -> Optional[DataFrameDict]:
+    def get_dataframes(self, asset_uid: str, **kwargs) -> Optional[DataFrameList]:
         """Obtiene datos de encuesta y los convierte a DataFrames."""
+        try:
+            dataframes_dict = self._get_processed_data(asset_uid, **kwargs)
+            if not dataframes_dict:
+                return None
+            # Convertir el diccionario de DataFrames a una lista
+            return list(dataframes_dict.values())
+        except Exception:
+            return None
+
+    def _get_processed_data(self, asset_uid: str, **kwargs) -> Optional[DataFrameDict]:
+        """Método privado para obtener y procesar datos, reutilizable internamente."""
         try:
             data = self.get_data(asset_uid, **kwargs)
             if not data:
@@ -66,14 +77,19 @@ class KoboAPI:
     def export_excel(self, asset_uid: str, filename: Optional[str] = None, **kwargs) -> bool:
         """Exporta datos de encuesta a archivo Excel."""
         try:
-            dataframes = self.get_dataframes(asset_uid, **kwargs)
-            if not dataframes:
+            # Obtener los datos procesados directamente como diccionario para preservar nombres
+            dataframes_dict = self._get_processed_data(asset_uid, **kwargs)
+            if not dataframes_dict:
                 return False
+
+            # Obtener el nombre del survey para usarlo como nombre de la sheet principal
+            asset_details = self.get_asset(asset_uid)
+            survey_name = asset_details.get('name', 'survey') if asset_details else 'survey'
 
             if filename is None:
                 filename = self._generate_filename(asset_uid)
 
-            return self._excel_exporter.export(dataframes, filename)
+            return self._excel_exporter.export(dataframes_dict, filename, survey_name)
         except Exception:
             return False
 

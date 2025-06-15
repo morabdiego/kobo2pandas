@@ -30,8 +30,14 @@ class JSONDataProcessor:
         self._tables = {}
         self._counters = {}
 
-    def _process_record(self, record: JSONDict, table_name: str, record_index: int,
-                       parent_index: int = None, parent_table: str = None) -> None:
+    def _process_record(
+            self,
+            record: JSONDict,
+            table_name: str,
+            record_index: int,
+            parent_index: int = None,
+            parent_table: str = None
+            ) -> None:
         base_record = {'_index': record_index}
         if parent_index is not None:
             base_record['_parent_index'] = parent_index
@@ -115,7 +121,7 @@ class ExcelExporter:
     def __init__(self, config: ProcessingConfig):
         self._config = config
 
-    def export(self, dataframes: DataFrameDict, filename: str) -> bool:
+    def export(self, dataframes: DataFrameDict, filename: str, survey_name: str = None) -> bool:
         """Exporta DataFrames a archivo Excel."""
         try:
             valid_dataframes = self._filter_valid_dataframes(dataframes)
@@ -123,7 +129,7 @@ class ExcelExporter:
                 return False
 
             self._ensure_directory_exists(filename)
-            sheet_names = self._generate_sheet_names(valid_dataframes)
+            sheet_names = self._generate_sheet_names(valid_dataframes, survey_name)
             return self._write_excel_file(valid_dataframes, sheet_names, filename)
 
         except Exception:
@@ -135,19 +141,40 @@ class ExcelExporter:
             if '_validation_status' not in table_name and not df.empty
         }
 
-    def _generate_sheet_names(self, dataframes: DataFrameDict) -> Dict[str, str]:
+    def _generate_sheet_names(self, dataframes: DataFrameDict, survey_name: str = None) -> Dict[str, str]:
         sheet_names = {}
         used_names = set()
 
         for table_name in dataframes.keys():
             if table_name == "root":
-                base_name = "root"
-            else:
-                meaningful_name = StringUtils.extract_meaningful_name(table_name)
+                # Usar el nombre del survey en lugar de "root"
                 base_name = StringUtils.sanitize_sheet_name(
-                    meaningful_name,
+                    survey_name or "survey",
                     self._config.max_sheet_name_length
                 )
+            else:
+                # Para grupos anidados, extraer el nombre más significativo
+                if table_name.startswith("root_"):
+                    group_name = table_name[5:]  # Remover "root_"
+                    # Dividir por '_' y tomar la última parte más significativa
+                    parts = group_name.split('_')
+                    # Si hay partes duplicadas consecutivas, tomar la última parte única
+                    if len(parts) > 1:
+                        # Para casos como "hogar_hogar_individuo" -> tomar "individuo"
+                        base_name = parts[-1]
+                    else:
+                        base_name = group_name
+
+                    base_name = StringUtils.sanitize_sheet_name(
+                        base_name,
+                        self._config.max_sheet_name_length
+                    )
+                else:
+                    meaningful_name = StringUtils.extract_meaningful_name(table_name)
+                    base_name = StringUtils.sanitize_sheet_name(
+                        meaningful_name,
+                        self._config.max_sheet_name_length
+                    )
 
             unique_name = self._ensure_unique_name(base_name, used_names)
             sheet_names[table_name] = unique_name
@@ -177,7 +204,7 @@ class ExcelExporter:
         try:
             with pd.ExcelWriter(filename, engine='openpyxl') as writer:
                 table_order = (["root"] if "root" in dataframes else []) + \
-                             [name for name in dataframes.keys() if name != "root"]
+                            [name for name in dataframes.keys() if name != "root"]
 
                 for table_name in table_order:
                     df = dataframes[table_name]

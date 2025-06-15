@@ -8,6 +8,7 @@ JSONData = Union[Dict[str, Any], List[Any], str, int, float, bool, None]
 JSONDict = Dict[str, Any]
 JSONList = List[JSONDict]
 DataFrameDict = Dict[str, pd.DataFrame]
+DataFrameList = List[pd.DataFrame]
 AssetList = List[Dict[str, Any]]
 
 

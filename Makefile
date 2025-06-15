@@ -1,35 +1,23 @@
-# Variables
-VENV_DIR = .venv
-PYTHON = python3
-PIP = $(VENV_DIR)/bin/pip
-PYTHON_VENV = $(VENV_DIR)/bin/python
+.PHONY: clean uninstall build install all
 
-# Crear entorno virtual
-env:
-	$(PYTHON) -m venv $(VENV_DIR)
-	$(PIP) install --upgrade pip
-	$(PIP) install -r requirements.txt
-	@echo "Entorno virtual creado en $(VENV_DIR)"
-	@echo "Para activar: source $(VENV_DIR)/bin/activate"
+PACKAGE_NAME=kobo2pandas
 
-# Limpiar archivos generados
 clean:
-	find . -name "*.json" -type f -delete
-	find . -name "*.xlsx" -type f -delete
-	find . -name "__pycache__" -type d -exec rm -rf {} +
-	@echo "Archivos JSON, XLSX y directorios __pycache__ eliminados"
+	echo "🧹 Limpiando dist/, egg-info, __pycache__, pytest_cache y smoke output..."
+	rm -rf dist/ *.egg-info
+	find . -type d -name "__pycache__" -exec rm -r {} + || true
 
-# Limpiar entorno virtual
-clean-env:
-	rm -rf $(VENV_DIR)
-	@echo "Entorno virtual eliminado"
+uninstall:
+	echo "❌ Desinstalando paquete si está instalado..."
+	pip uninstall -y $(PACKAGE_NAME) || true
 
-# Reinstalar entorno
-reinstall: clean-env env
+build: clean
+	echo "📦 Construyendo paquete..."
+	python -m build
 
-# Activar entorno (helper)
-activate:
-	@echo "Para activar el entorno virtual ejecuta:"
-	@echo "source $(VENV_DIR)/bin/activate"
+install: uninstall build
+	echo "📥 Instalando paquete desde dist/*.whl..."
+	pip install dist/*.whl
 
-.PHONY: env clean clean-env reinstall activate
+all: clean uninstall build install
+	echo "🏁 Proceso completo (build, install, test, smoke) terminado."

@@ -1,19 +1,15 @@
-# Kobo2Pandas - Extractor de Datos de KoboToolbox
+# kobo2pandas - Extractor de Datos de KoboToolbox
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-2.0.0-orange.svg)](https://github.com/your-repo/kobo2pandas)
 
-Una librería Python minimalista y eficiente para extraer y procesar datos de KoboToolbox, aplicando principios SOLID y DRY para un código limpio y mantenible.
+Un paquete de python para acceder a la API de KoboToolbox y transformar las respuestas de las encuestas directamente a dataframes, recursivamente.
 
 ## 🚀 Características
 
-- **API Simplificada**: Una sola clase `KoboAPI` con interfaz clara y concisa
+- **Cliente de la API**: Acceso a principales características de la API oficial.
 - **Procesamiento Automático**: Convierte datos JSON anidados en DataFrames relacionados
 - **Exportación a Excel**: Genera archivos Excel con múltiples hojas automáticamente
-- **Configuración Flexible**: Personaliza el comportamiento mediante `ProcessingConfig`
-- **Arquitectura Limpia**: Implementa principios SOLID para máxima mantenibilidad
-- **Mínimas Dependencias**: Solo las librerías esenciales
 
 ## 📦 Instalación
 
@@ -27,15 +23,9 @@ pip install kobo2pandas
 from kobo2pandas import KoboAPI
 
 # Inicializar cliente
-kobo = KoboAPI(token="tu_token_aqui", debug=True)
+kobo = KoboAPI(token="TU_API_KEY", debug=True)
 
-# Obtener lista de assets
-assets = kobo.list_assets()
-print(f"Assets disponibles: {len(assets)}")
-
-# Procesar datos a DataFrames
-asset_uid = "tu_asset_uid"
-dataframes = kobo.get_dataframes(asset_uid)
+asset_uid = kobo.list_uid()['nombre_de_tu_encuesta']
 
 # Exportar a Excel
 kobo.export_excel(asset_uid, "mi_encuesta.xlsx")
@@ -61,11 +51,6 @@ KoboAPI(token: str, endpoint: str = 'default', debug: bool = False)
 #### 1. `list_assets() -> List[Dict[str, Any]]`
 Lista todos los assets (formularios) disponibles en tu cuenta.
 
-```python
-assets = kobo.list_assets()
-for asset in assets:
-    print(f"Nombre: {asset['name']}, UID: {asset['uid']}")
-```
 
 #### 2. `list_uid() -> Dict[str, str]`
 Retorna un mapeo de nombres de assets a sus UIDs.
@@ -78,11 +63,6 @@ asset_uid = uid_mapping['Mi Formulario']
 #### 3. `get_asset(asset_uid: str) -> Dict[str, Any]`
 Obtiene información detallada de un asset específico.
 
-```python
-asset = kobo.get_asset(asset_uid)
-print(f"Creado: {asset['date_created']}")
-print(f"Respuestas: {asset['deployment__submission_count']}")
-```
 
 #### 4. `get_data(asset_uid: str, **filters) -> Dict[str, Any]`
 Obtiene los datos brutos de una encuesta con filtros opcionales.
@@ -112,40 +92,25 @@ data = kobo.get_data(
 - `submitted_after` (str): Fecha en formato ISO (YYYY-MM-DD)
 - `query` (str): Query MongoDB personalizada
 
-#### 5. `get_dataframes(asset_uid: str, **kwargs) -> Optional[Dict[str, DataFrame]]`
-Convierte los datos de la encuesta en DataFrames de pandas organizados por tabla.
+#### 5. `get_dataframes(asset_uid: str, **kwargs) -> Optional[List[DataFrame]]`
+Convierte los datos de la encuesta en una lista de DataFrames de pandas organizados por tabla según niveles de anidación.
 
 ```python
-dataframes = kobo.get_dataframes(asset_uid, limit=50)
-
-if dataframes:
-    # Tabla principal
-    main_data = dataframes['root']
-    print(f"Registros principales: {len(main_data)}")
-
-    # Tablas anidadas (si existen)
-    for table_name, df in dataframes.items():
-        if table_name != 'root':
-            print(f"Tabla {table_name}: {len(df)} registros")
+dataframes = kobo.get_dataframes(asset_uid)
+# Ahora devuelve una lista de DataFrames en lugar de un diccionario
+for i, df in enumerate(dataframes):
+    print(f"DataFrame {i}: {df.shape}")
 ```
 
 #### 6. `export_excel(asset_uid: str, filename: Optional[str] = None, **kwargs) -> bool`
-Exporta los datos directamente a un archivo Excel con múltiples hojas.
+Exporta los datos directamente a un archivo Excel con tantas sheets commo niveles de anidación.
 
 ```python
 # Con nombre automático
-success = kobo.export_excel(asset_uid)
+kobo.export_excel(asset_uid)
 
 # Con nombre personalizado
-success = kobo.export_excel(asset_uid, "mi_archivo.xlsx")
-
-# Con filtros
-success = kobo.export_excel(
-    asset_uid,
-    "datos_filtrados.xlsx",
-    limit=100,
-    submitted_after="2023-01-01"
-)
+kobo.export_excel(asset_uid, "mi_archivo.xlsx")
 ```
 
 #### 7. `get_choices(asset: Dict[str, Any]) -> Dict[str, Dict[str, Any]]`
@@ -174,87 +139,11 @@ for question in questions:
     print(f"Etiqueta: {question.get('label')}")
 ```
 
-## 🎯 Ejemplos Avanzados
-
-### Procesamiento Completo con Análisis
-
-```python
-from kobo2pandas import KoboAPI
-import pandas as pd
-
-# Configurar cliente
-kobo = KoboAPI(token="tu_token", debug=True)
-
-# Obtener mapeo de assets
-assets = kobo.list_uid()
-print("Assets disponibles:")
-for name, uid in assets.items():
-    print(f"  - {name}: {uid}")
-
-# Procesar asset específico
-asset_uid = assets['Mi Encuesta']
-dataframes = kobo.get_dataframes(asset_uid)
-
-if dataframes:
-    # Análisis de la tabla principal
-    main_df = dataframes['root']
-    print(f"\n📊 Análisis de datos:")
-    print(f"Total respuestas: {len(main_df)}")
-    print(f"Columnas: {list(main_df.columns)}")
-
-    # Análisis de tablas relacionadas
-    for table_name, df in dataframes.items():
-        if table_name != 'root':
-            print(f"\n📋 Tabla {table_name}:")
-            print(f"  Registros: {len(df)}")
-            print(f"  Columnas: {list(df.columns)}")
-
-    # Exportar todo a Excel
-    success = kobo.export_excel(asset_uid, "analisis_completo.xlsx")
-    if success:
-        print("✅ Datos exportados exitosamente")
-```
-
-### Filtrado y Procesamiento por Fechas
-
-```python
-from datetime import datetime, timedelta
-
-# Obtener datos de los últimos 30 días
-fecha_limite = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-
-dataframes = kobo.get_dataframes(
-    asset_uid,
-    submitted_after=fecha_limite,
-    limit=1000
-)
-
-if dataframes:
-    main_df = dataframes['root']
-    print(f"Respuestas últimos 30 días: {len(main_df)}")
-
-    # Exportar con nombre descriptivo
-    filename = f"datos_{fecha_limite}_a_hoy.xlsx"
-    kobo.export_excel(asset_uid, filename, submitted_after=fecha_limite)
-```
-
 ## 🛠️ Estructura de Datos
 
-### DataFrames Generados
-
-La librería convierte automáticamente datos JSON anidados en múltiples DataFrames relacionados:
-
-- **Tabla `root`**: Contiene los campos principales de cada respuesta
-- **Tablas anidadas**: Una por cada grupo repetible (ej: `root_miembros_familia`)
-- **Columnas de relación**: `_index`, `_parent_index`, `_parent_table` para mantener trazabilidad
-
-### Archivos Excel
-
-Los archivos Excel generados contienen:
-- Una hoja por cada DataFrame
-- Nombres de hojas sanitizados (máximo 31 caracteres)
-- Tabla principal en la primera hoja
-- Orden lógico de las hojas relacionadas
+Los datos descargados desde la API convierten el JSON en pandas.DataFrame según nivel de anidación.
+En el caso que existan más de un nivel de anidación, el return principal es una lista de los dataframes generados.
+La relación entre los dataframes son idénticos a los generados por la herramienta de exportación de Kobo: _index, _parent_index y _parent_table para mantener las relaciones presentes en el JSON.
 
 ## 🔍 Debugging
 
